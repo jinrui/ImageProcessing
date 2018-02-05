@@ -11,14 +11,34 @@ import numpy as np
 import matplotlib.pylab as plt
 from PIL import Image
 import random
+import os
+import pandas as pd
+filepath = './data/Data_Collection/'
+ratepath = './data/Rating_Collection/allraters.csv'
+os.system('ls')
+files = os.listdir(filepath)
+filelist = [filepath+i for i in files]
+def handleImg():
+    ylabel = pd.read_csv(ratepath)
+    ylabel1 = ylabel[['#image','Rating']].groupby(['#image']).median()#['Rating']
+    print(ylabel1.loc[1])
+    return ylabel1
+ylabel = handleImg()
+    
 
 def getBatchImage(filelist,batch):
     result = []
+    yresult = []
     random.shuffle (filelist)
     for i in range(batch):
         img = Image.open(filelist[i]).resize((128,128))
         result.append(img)
-    return img
+        num = filelist[i].split('-')[-1].split('.')[0]
+        y = ylabel.loc[num]
+        yla = np.zeros([1,5],0)
+        yla[y]=1
+        yresult.append(yla)
+    return img,yresult
 
 
 def weight_variable(shape):
@@ -76,4 +96,5 @@ accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 with tf.Session() as sess:
     for i in range(epoch):
-        getBatchImage(batch_size)
+        x_train,y_train=getBatchImage(batch_size)
+        acc,cos,_=sess.run([accuracy,cost,train],feed_dicg={x:x_train,y:y_train})
