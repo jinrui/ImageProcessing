@@ -17,7 +17,7 @@ filepath = './data/Data_Collection/'
 ratepath = './data/Rating_Collection/allraters.csv'
 os.system('ls')
 files = os.listdir(filepath)
-filelist = [filepath+i for i in files]
+filelist = [filepath+i for i in files if i.endswith('jpg')]
 def handleImg():
     ylabel = pd.read_csv(ratepath)
     #ylabel.dropna()
@@ -35,7 +35,7 @@ def getBatchImage(batch):
     yresult = []
     random.shuffle (filelist)
     for i in range(batch):
-        if not filelist[i].endwith('jpg'):
+        if not filelist[i].endswith('jpg'):
             continue
         img = Image.open(filelist[i]).resize((128,128))
         result.append(numpy.array(img)/255)
@@ -80,8 +80,12 @@ def makesoftnet(x,w_shape,b_shape):
     return tf.nn.softmax(tf.matmul(x,w)+b)
 
 batch_size=16
-lr = 0.0001
-epoch = 100
+lr = 0.01
+epoch = 1000
+global_step = tf.Variable(0)
+learning_rate = tf.train.exponential_decay(lr,
+                                           global_step=global_step,
+                                           decay_steps=10,decay_rate=0.9)
 
 x = tf.placeholder(tf.float32,[batch_size,128,128,3])
 y = tf.placeholder(tf.float32,[batch_size,5])
@@ -96,7 +100,7 @@ c3 = makefullnet(tf.reshape(h2,[-1,32*32*32]),[32*32*32,1024],[1024],keep_prob)
 c4 = makesoftnet(c3,[1024,5],[5])+1e-10
 
 cost = tf.reduce_mean(-tf.reduce_sum(y*tf.log(c4),reduction_indices=[1]))
-train = tf.train.AdamOptimizer(lr).minimize(cost)
+train = tf.train.AdamOptimizer(learning_rate).minimize(cost)
 
 correct_prediction = tf.equal(tf.argmax(c4,1), tf.argmax(y,1)) # 计算准确度
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -106,7 +110,7 @@ with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     for i in range(epoch):
         x_train,y_train=getBatchImage(batch_size)
-      
+        global_step=i
         #print(x_train,y_train)
       
         acc,cos,_=sess.run([accuracy,cost,train],feed_dict={x:x_train,y:y_train,keep_prob: 0.8})
