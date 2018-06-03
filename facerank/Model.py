@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
 Created on Sun Feb  4 22:04:14 2018
@@ -38,7 +38,7 @@ def getBatchImage(batch):
         if not filelist[i].endswith('jpg'):
             continue
         img = Image.open(filelist[i]).resize((128,128))
-        result.append(numpy.array(img)/255)
+        result.append(np.array(img)/255)
         num = int(filelist[i].split('-')[-1].split('.')[0])
         #print(num)
         y = int(ylabel.loc[num]['Rating'])-1
@@ -81,7 +81,7 @@ def makesoftnet(x,w_shape,b_shape):
 
 batch_size=16
 lr = 0.01
-epoch = 1000
+epoch = 100
 global_step = tf.Variable(0)
 learning_rate = tf.train.exponential_decay(lr,
                                            global_step=global_step,
@@ -91,18 +91,33 @@ x = tf.placeholder(tf.float32,[batch_size,128,128,3])
 y = tf.placeholder(tf.float32,[batch_size,5])
 keep_prob = tf.placeholder(tf.float32)
 
-h1 = makenet(x,[5,5,3,16],[16])    
-h2 = makenet(h1,[5,5,16,32],[32])
+#h1 = makenet(x,[5,5,3,16],[16])    
+#h2 = makenet(h1,[5,5,16,32],[32])
+h1 = tf.layers.conv2d(x,16,(5,5),padding='same',activation=tf.nn.relu)
+c1 = tf.layers.max_pooling2d(h1,(2,2),1,padding='same')
 
+h2 = tf.layers.conv2d(c1,32,(5,5),padding='same',activation=tf.nn.relu)
+c2 = tf.layers.max_pooling2d(h2,(2,2),1,padding='same')
+
+h3 = tf.layers.conv2d(c2,64,(5,5),padding='same',activation=tf.nn.relu)
+c3 = tf.layers.max_pooling2d(h3,(2,2),1,padding='same')
 #full connected
-c3 = makefullnet(tf.reshape(h2,[-1,32*32*32]),[32*32*32,1024],[1024],keep_prob)
+c3 = tf.contrib.layers.flatten(c3)
+c4 = tf.layers.dense(c3,256)
 
-c4 = makesoftnet(c3,[1024,5],[5])+1e-10
+dropout = tf.layers.dropout(c4,rate=0.3)
 
-cost = tf.reduce_mean(-tf.reduce_sum(y*tf.log(c4),reduction_indices=[1]))
+logits = tf.layers.dense(inputs=dropout, units=5)
+
+soft = tf.nn.softmax(logits)
+#c3 = makefullnet(tf.reshape(h2,[-1,32*32*32]),[32*32*32,1024],[1024],keep_prob)
+
+#c4 = makesoftnet(c3,[1024,5],[5])+1e-10
+
+cost = tf.reduce_mean(-tf.reduce_sum(y*tf.log(soft),reduction_indices=[1]))+1e-6
 train = tf.train.AdamOptimizer(learning_rate).minimize(cost)
 
-correct_prediction = tf.equal(tf.argmax(c4,1), tf.argmax(y,1)) # 计算准确度
+correct_prediction = tf.equal(tf.argmax(soft,1), tf.argmax(y,1)) # 计算准确度
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 
